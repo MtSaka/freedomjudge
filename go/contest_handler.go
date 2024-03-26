@@ -93,25 +93,9 @@ func gettaskabstarcts(ctx context.Context, c echo.Context) ([]TaskAbstract, erro
 			team := Team{}
 			err := dbConn.GetContext(c.Request().Context(), &team, "SELECT * FROM teams WHERE leader_id = ? OR member1_id = ? OR member2_id = ?", user.ID, user.ID, user.ID)
 			if err == nil {
-				err := dbConn.GetContext(c.Request().Context(), &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.LeaderID)
+				err := dbConn.GetContext(c.Request().Context(), &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?)", task.ID, team.LeaderID, team.Member1ID, team.Member2ID)
 				if err != nil {
 					return []TaskAbstract{}, err
-				}
-				if team.Member1ID != nulluserid {
-					cnt := 0
-					err := dbConn.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member1ID)
-					if err != nil {
-						return []TaskAbstract{}, err
-					}
-					submissioncount += cnt
-				}
-				if team.Member2ID != nulluserid {
-					cnt := 0
-					err := dbConn.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member2ID)
-					if err != nil {
-						return []TaskAbstract{}, err
-					}
-					submissioncount += cnt
 				}
 
 				if sc, ok := standingssubcache.Load(team.ID*10000 + task.ID); ok {
