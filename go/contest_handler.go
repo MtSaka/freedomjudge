@@ -48,6 +48,7 @@ type Submission struct {
 	UserID      int       `db:"user_id"`
 	SubmittedAt time.Time `db:"submitted_at"`
 	Answer      string    `db:"answer"`
+	SubTaskID   int       `db:"subtask_id"`
 	Score       int       `db:"score"`
 }
 
@@ -635,6 +636,7 @@ func submitHandler(c echo.Context) error {
 	if err := tx.SelectContext(c.Request().Context(), &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtasks: "+err.Error())
 	}
+	subtaskid := -1
 	for _, subtask := range subtasks {
 		answers := []Answer{}
 		if err := tx.SelectContext(c.Request().Context(), &answers, "SELECT * FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
@@ -655,13 +657,14 @@ func submitHandler(c echo.Context) error {
 				res.SubtaskName = subtask.Name
 				res.SubTaskDisplayName = subtask.DisplayName
 				res.SubTaskMaxScore = subtaskmaxscore
+				subtaskid = subtask.ID
 			}
 		}
 	}
 
 	timestamp := time.Unix(req.Timestamp, 0)
 
-	if _, err = tx.ExecContext(ctx, "INSERT INTO submissions (task_id, user_id, submitted_at, answer, score) VALUES (?, ?, ?, ?, ?)", task.ID, user.ID, timestamp, req.Answer, res.Score); err != nil {
+	if _, err = tx.ExecContext(ctx, "INSERT INTO submissions (task_id, user_id, submitted_at, answer, task_id, score) VALUES (?, ?, ?, ?, ?, ?)", task.ID, user.ID, timestamp, req.Answer, subtaskid, res.Score); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert submission: "+err.Error())
 	}
 
