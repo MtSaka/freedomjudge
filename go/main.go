@@ -63,6 +63,7 @@ func connectDB() (*sqlx.DB, error) {
 	config.Passwd = getEnv("RISUCON_DB_PASSWORD", "risucon")
 	config.DBName = getEnv("RISUCON_DB_NAME", "risucontest")
 	config.ParseTime = true
+	config.Params = map[string]string{"interpolateParams": "true"}
 	dsn := config.FormatDSN()
 	return sqlx.Open("mysql", dsn)
 }
