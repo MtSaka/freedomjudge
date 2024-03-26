@@ -4,6 +4,7 @@ package main
 
 import (
 	// "fmt"
+	"database/sql"
 	"log"
 	"net"
 	"net/http"
@@ -80,7 +81,9 @@ func initializeHandler(c echo.Context) error {
 	}
 	for _, sub := range subs {
 		score := 0
-		if err := dbConn.Get(&score, "SELECT COALESCE(score, 0) FROM answers WHERE task_id = ? AND answer = ?", sub.TaskID, sub.Answer); err != nil {
+		if err := dbConn.Get(&score, "SELECT score FROM answers WHERE task_id = ? AND answer = ?", sub.TaskID, sub.Answer); err == sql.ErrNoRows{
+			score = 0
+		} else if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to select answers: "+err.Error())
 		}
 		if _, err := dbConn.Exec("UPDATE submissions SET score = ? WHERE id = ?", score, sub.ID); err != nil {
