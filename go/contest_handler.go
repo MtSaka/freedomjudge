@@ -266,12 +266,17 @@ func getstandings(ctx context.Context) (Standings, error) {
 				taskscoringdata.HasSubmitted = true
 			}
 
-			sc := []int{}
-			if err := dbConn.SelectContext(ctx, &sc, "SELECT MAX(score) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) GROUP BY subtask_id;", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
-				return Standings{}, err
-			}
-			for _, s := range sc {
-				taskscoringdata.Score += s
+			if sc, ok := standingssubcache.Load(team.ID*10000 + task.ID); ok {
+				taskscoringdata.Score = sc.(int)
+			} else {
+				sc := []int{}
+				if err := dbConn.SelectContext(ctx, &sc, "SELECT MAX(score) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) GROUP BY subtask_id;", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
+					return Standings{}, err
+				}
+				for _, s := range sc {
+					taskscoringdata.Score += s
+				}
+				standingssubcache.Store(team.ID*10000+task.ID, taskscoringdata.Score)
 			}
 
 			scoringdata = append(scoringdata, taskscoringdata)
