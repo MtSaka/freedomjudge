@@ -300,16 +300,23 @@ func getstandings(ctx context.Context, tx *sqlx.Tx) (Standings, error) {
 				subtaskscore := 0
 
 				leaderscore := 0
-				if err := tx.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.LeaderID); err != nil {
+				/*if err := tx.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.LeaderID); err != nil {
+					return Standings{}, err
+				}*/
+				if err := tx.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM submissions WHERE subtask_id = ? AND user_id = ?", subtask.ID, team.LeaderID); err != nil {
 					return Standings{}, err
 				}
+
 				if subtaskscore < leaderscore {
 					subtaskscore = leaderscore
 				}
 
 				if team.Member1ID != nulluserid {
 					member1score := 0
-					if err := tx.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member1ID); err != nil {
+					/*if err := tx.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member1ID); err != nil {
+						return Standings{}, err
+					}*/
+					if err := tx.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM submissions WHERE subtask_id = ? AND user_id = ?", subtask.ID, team.Member1ID); err != nil {
 						return Standings{}, err
 					}
 					if subtaskscore < member1score {
@@ -318,7 +325,10 @@ func getstandings(ctx context.Context, tx *sqlx.Tx) (Standings, error) {
 				}
 				if team.Member2ID != nulluserid {
 					member2score := 0
-					if err := tx.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member2ID); err != nil {
+					/*if err := tx.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member2ID); err != nil {
+						return Standings{}, err
+					}*/
+					if err := tx.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM submissions WHERE subtask_id = ? AND user_id = ?", subtask.ID, team.Member2ID); err != nil {
 						return Standings{}, err
 					}
 					if subtaskscore < member2score {
@@ -611,11 +621,7 @@ func submitHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "submission limit exceeded")
 	}
 
-	timestamp := time.Unix(req.Timestamp, 0)
-
-	if _, err = tx.ExecContext(ctx, "INSERT INTO submissions (task_id, user_id, submitted_at, answer) VALUES (?, ?, ?, ?)", task.ID, user.ID, timestamp, req.Answer); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert submission: "+err.Error())
-	}
+	
 
 	res := SubmitResponse{}
 
@@ -650,6 +656,12 @@ func submitHandler(c echo.Context) error {
 				res.SubTaskMaxScore = subtaskmaxscore
 			}
 		}
+	}
+
+	timestamp := time.Unix(req.Timestamp, 0)
+
+	if _, err = tx.ExecContext(ctx, "INSERT INTO submissions (task_id, user_id, submitted_at, answer, score) VALUES (?, ?, ?, ?, ?)", task.ID, user.ID, timestamp, req.Answer, res.Score); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert submission: "+err.Error())
 	}
 
 	if err := tx.Commit(); err != nil {

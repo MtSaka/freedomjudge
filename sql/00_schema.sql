@@ -58,7 +58,8 @@ CREATE TABLE `submissions` (
     `task_id` INT NOT NULL,
     `user_id` INT NOT NULL,
     `submitted_at` DATETIME NOT NULL,
-    `answer` VARCHAR(255) NOT NULL
+    `answer` VARCHAR(255) NOT NULL,
+    `score` INT NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX `sub_idx` ON `submissions` (`task_id`, `user_id`, `answer`);
