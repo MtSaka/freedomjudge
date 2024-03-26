@@ -50,6 +50,7 @@ CREATE TABLE `answers` (
     `score` INT NOT NULL,
     UNIQUE `uniq_answer` (`task_id`, `answer`)
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE INDEX `ans_idx` ON `answers` (`subtask_id`);
 
 DROP TABLE IF EXISTS `submissions`;
 CREATE TABLE `submissions` (
@@ -60,3 +61,4 @@ CREATE TABLE `submissions` (
     `answer` VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
+CREATE INDEX `sub_idx` ON `submissions` (`task_id`, `user_id`, `answer`);
