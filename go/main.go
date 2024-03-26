@@ -22,8 +22,6 @@ import (
 	echolog "github.com/labstack/gommon/log"
 
 	_ "net/http/pprof"
-
-	"github.com/felixge/fgprof"
 )
 
 const (
@@ -105,10 +103,10 @@ func initializeHandler(c echo.Context) error {
 }
 
 func main() {
-	http.DefaultServeMux.Handle("/debug/fgprof/profile", fgprof.Handler())
+	/*http.DefaultServeMux.Handle("/debug/fgprof/profile", fgprof.Handler())
 	go func() {
 		log.Println(http.ListenAndServe(":6060", nil))
-	}()
+	}()*/
 
 	e := echo.New()
 	e.Debug = false
