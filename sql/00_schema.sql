@@ -65,3 +65,4 @@ CREATE TABLE `submissions` (
 
 CREATE INDEX `sub_idx` ON `submissions` (`task_id`, `user_id`, `answer`);
 CREATE INDEX `sub_idx2` ON `submissions` (`subtask_id`, `user_id`);
+CREATE INDEX `sub_idx3` ON `submissions` (`task_id`, `user_id`, `subtask_id`);

@@ -208,7 +208,7 @@ func getstandings(ctx context.Context) (Standings, error) {
 		return Standings{}, err
 	}
 	for _, task := range tasks {
-		subtasks := []Subtask{}
+		/*subtasks := []Subtask{}
 		if err := dbConn.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
 			return Standings{}, err
 		}
@@ -219,7 +219,16 @@ func getstandings(ctx context.Context) (Standings, error) {
 				return Standings{}, err
 			}
 			maxscore += subtaskmaxscore
+		}*/
+		maxscore := 0
+		sc := []int{}
+		if err := dbConn.SelectContext(ctx, &sc, "SELECT MAX(score) FROM answers WHERE task_id = ? GROUP BY subtask_id", task.ID); err != nil {
+			return Standings{}, err
 		}
+		for _, s := range sc {
+			maxscore += s
+		}
+		
 		standings.TasksData = append(standings.TasksData, TaskAbstract{
 			Name:        task.Name,
 			DisplayName: task.DisplayName,
