@@ -390,25 +390,9 @@ func getTaskHandler(c echo.Context) error {
 		team := Team{}
 		err := dbConn.GetContext(c.Request().Context(), &team, "SELECT * FROM teams WHERE leader_id = ? OR member1_id = ? OR member2_id = ?", user.ID, user.ID, user.ID)
 		if err == nil {
-			err := dbConn.GetContext(c.Request().Context(), &res.SubmissionCount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.LeaderID)
+			err := dbConn.GetContext(c.Request().Context(), &res.SubmissionCount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?)", task.ID, team.LeaderID, team.Member1ID, team.Member2ID)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get submission count: "+err.Error())
-			}
-			if team.Member1ID != nulluserid {
-				cnt := 0
-				err := dbConn.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member1ID)
-				if err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "failed to get submission count: "+err.Error())
-				}
-				res.SubmissionCount += cnt
-			}
-			if team.Member2ID != nulluserid {
-				cnt := 0
-				err := dbConn.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member2ID)
-				if err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "failed to get submission count: "+err.Error())
-				}
-				res.SubmissionCount += cnt
 			}
 
 			for i, subtask := range subtasks {
