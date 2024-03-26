@@ -288,7 +288,9 @@ func getstandings(ctx context.Context) (Standings, error) {
 	}
 
 	// sort
-	sort.Slice(standings,func(i, j int) bool {return (standings.StandingsData[i].TotalScore < standings.StandingsData[j].TotalScore) || (standings.StandingsData[i].TotalScore == standings.StandingsData[j].TotalScore && standings.StandingsData[i].TeamName > standings.StandingsData[j].TeamName) })
+	sort.Slice(standings,func(i, j int) bool {
+		return (standings.StandingsData[i].TotalScore < standings.StandingsData[j].TotalScore) || (standings.StandingsData[i].TotalScore == standings.StandingsData[j].TotalScore && standings.StandingsData[i].TeamName > standings.StandingsData[j].TeamName
+	})
 	for i := 0; i < len(standings.StandingsData); i++ {
 		standings.StandingsData[i].Rank = 1
 		for j := 0; j < len(standings.StandingsData); j++ {
