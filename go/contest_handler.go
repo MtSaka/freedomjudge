@@ -19,7 +19,8 @@ var (
 	// メモ: initializeHandler でキャッシュを消すのを忘れずに
 	subtaskcache = sync.Map{}
 
-	standingssubcache = sync.Map{}
+	standingssubcache       = sync.Map{}
+	standingssubexistscache = sync.Map{}
 )
 
 type Task struct {
@@ -258,12 +259,17 @@ func getstandings(ctx context.Context) (Standings, error) {
 			if err := dbConn.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
 				return Standings{}, err
 			}
-			submissioncount := 0
-			if err := dbConn.GetContext(ctx, &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) LIMIT 1", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
-				return Standings{}, err
-			}
-			if submissioncount > 0 {
-				taskscoringdata.HasSubmitted = true
+			if b, ok := standingssubexistscache.Load(team.ID*10000 + task.ID); ok {
+				taskscoringdata.HasSubmitted = b.(bool)
+			} else {
+				submissioncount := 0
+				if err := dbConn.GetContext(ctx, &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) LIMIT 1", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
+					return Standings{}, err
+				}
+				if submissioncount > 0 {
+					taskscoringdata.HasSubmitted = true
+				}
+				standingssubexistscache.Store(team.ID*10000+task.ID, taskscoringdata.HasSubmitted)
 			}
 
 			if sc, ok := standingssubcache.Load(team.ID*10000 + task.ID); ok {
@@ -564,6 +570,7 @@ func submitHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert submission: "+err.Error())
 	}
 
+	standingssubexistscache.Store(team.ID*10000+task.ID, true)
 	if res.IsScored {
 		standingssubcache.Delete(team.ID*10000 + task.ID)
 	}
