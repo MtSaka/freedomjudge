@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 )
@@ -61,21 +60,21 @@ type TaskAbstract struct {
 	SubmissionCount int    `json:"submission_count,omitempty"`
 }
 
-func gettaskabstarcts(ctx context.Context, tx *sqlx.Tx, c echo.Context) ([]TaskAbstract, error) {
+func gettaskabstarcts(ctx context.Context, c echo.Context) ([]TaskAbstract, error) {
 	tasks := []Task{}
-	if err := tx.SelectContext(ctx, &tasks, "SELECT * FROM tasks ORDER BY name"); err != nil {
+	if err := dbConn.SelectContext(ctx, &tasks, "SELECT * FROM tasks ORDER BY name"); err != nil {
 		return []TaskAbstract{}, err
 	}
 	res := []TaskAbstract{}
 	for _, task := range tasks {
 		maxscore := 0
 		subtasks := []Subtask{}
-		if err := tx.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
+		if err := dbConn.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
 			return []TaskAbstract{}, err
 		}
 		for _, subtask := range subtasks {
 			maxscore_for_subtask := 0
-			if err := tx.GetContext(ctx, &maxscore_for_subtask, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
+			if err := dbConn.GetContext(ctx, &maxscore_for_subtask, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
 				return []TaskAbstract{}, err
 			}
 			maxscore += maxscore_for_subtask
@@ -86,19 +85,19 @@ func gettaskabstarcts(ctx context.Context, tx *sqlx.Tx, c echo.Context) ([]TaskA
 			sess, _ := session.Get(defaultSessionIDKey, c)
 			username, _ := sess.Values[defaultSessionUserNameKey].(string)
 			user := User{}
-			if err := tx.GetContext(c.Request().Context(), &user, "SELECT * FROM users WHERE name = ?", username); err != nil {
+			if err := dbConn.GetContext(c.Request().Context(), &user, "SELECT * FROM users WHERE name = ?", username); err != nil {
 				return []TaskAbstract{}, err
 			}
 			team := Team{}
-			err := tx.GetContext(c.Request().Context(), &team, "SELECT * FROM teams WHERE leader_id = ? OR member1_id = ? OR member2_id = ?", user.ID, user.ID, user.ID)
+			err := dbConn.GetContext(c.Request().Context(), &team, "SELECT * FROM teams WHERE leader_id = ? OR member1_id = ? OR member2_id = ?", user.ID, user.ID, user.ID)
 			if err == nil {
-				err := tx.GetContext(c.Request().Context(), &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.LeaderID)
+				err := dbConn.GetContext(c.Request().Context(), &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.LeaderID)
 				if err != nil {
 					return []TaskAbstract{}, err
 				}
 				if team.Member1ID != nulluserid {
 					cnt := 0
-					err := tx.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member1ID)
+					err := dbConn.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member1ID)
 					if err != nil {
 						return []TaskAbstract{}, err
 					}
@@ -106,16 +105,24 @@ func gettaskabstarcts(ctx context.Context, tx *sqlx.Tx, c echo.Context) ([]TaskA
 				}
 				if team.Member2ID != nulluserid {
 					cnt := 0
-					err := tx.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member2ID)
+					err := dbConn.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member2ID)
 					if err != nil {
 						return []TaskAbstract{}, err
 					}
 					submissioncount += cnt
 				}
-				for _, subtask := range subtasks {
+				sc := []int{}
+				if err := dbConn.SelectContext(ctx, &sc, "SELECT MAX(score) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) GROUP BY subtask_id;", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
+					return []TaskAbstract{}, err
+				}
+				for _, s := range sc {
+					score += s
+				}
+
+				/*for _, subtask := range subtasks {
 					score_for_subtask := 0
 					leaderscore := 0
-					if err := tx.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.LeaderID); err != nil {
+					if err := dbConn.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.LeaderID); err != nil {
 						return []TaskAbstract{}, err
 					}
 					if score_for_subtask < leaderscore {
@@ -123,7 +130,7 @@ func gettaskabstarcts(ctx context.Context, tx *sqlx.Tx, c echo.Context) ([]TaskA
 					}
 					if team.Member1ID != nulluserid {
 						member1score := 0
-						if err := tx.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member1ID); err != nil {
+						if err := dbConn.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member1ID); err != nil {
 							return []TaskAbstract{}, err
 						}
 						if score_for_subtask < member1score {
@@ -132,7 +139,7 @@ func gettaskabstarcts(ctx context.Context, tx *sqlx.Tx, c echo.Context) ([]TaskA
 					}
 					if team.Member2ID != nulluserid {
 						member2score := 0
-						if err := tx.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member2ID); err != nil {
+						if err := dbConn.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member2ID); err != nil {
 							return []TaskAbstract{}, err
 						}
 						if score_for_subtask < member2score {
@@ -140,7 +147,7 @@ func gettaskabstarcts(ctx context.Context, tx *sqlx.Tx, c echo.Context) ([]TaskA
 						}
 					}
 					score += score_for_subtask
-				}
+				}*/
 			} else if err != sql.ErrNoRows {
 				return []TaskAbstract{}, err
 			}
@@ -162,19 +169,9 @@ func gettaskabstarcts(ctx context.Context, tx *sqlx.Tx, c echo.Context) ([]TaskA
 func getTasksHandler(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	tx, err := dbConn.BeginTxx(ctx, nil)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
-	}
-	defer tx.Rollback()
-
-	taskabstarcts, err := gettaskabstarcts(ctx, tx, c)
+	taskabstarcts, err := gettaskabstarcts(ctx, c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get taskabstarcts: "+err.Error())
-	}
-
-	if err := tx.Commit(); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit transaction: "+err.Error())
 	}
 
 	return c.JSON(http.StatusOK, taskabstarcts)
