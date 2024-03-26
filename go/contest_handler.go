@@ -22,6 +22,7 @@ var (
 	standingssubcache       = sync.Map{}
 	standingssubexistscache = sync.Map{}
 	usercache               = sync.Map{}
+	subtaskmaxscorecache    = sync.Map{}
 )
 
 type Task struct {
@@ -83,8 +84,13 @@ func gettaskabstarcts(ctx context.Context, c echo.Context) ([]TaskAbstract, erro
 		}
 		for _, subtask := range subtasks {
 			maxscore_for_subtask := 0
-			if err := dbConn.GetContext(ctx, &maxscore_for_subtask, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
-				return []TaskAbstract{}, err
+			if msc, ok := subtaskmaxscorecache.Load(subtask.ID); ok {
+				maxscore_for_subtask = msc.(int)
+			} else {
+				if err := dbConn.GetContext(ctx, &maxscore_for_subtask, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
+					return []TaskAbstract{}, err
+				}
+				subtaskmaxscorecache.Store(subtask.ID, maxscore_for_subtask)
 			}
 			maxscore += maxscore_for_subtask
 		}
@@ -400,8 +406,13 @@ func getTaskHandler(c echo.Context) error {
 			DisplayName: subtask.DisplayName,
 			Statement:   subtask.Statement,
 		}
-		if err := dbConn.GetContext(c.Request().Context(), &subtaskdetail.MaxScore, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtask score: "+err.Error())
+		if msc, ok := subtaskmaxscorecache.Load(subtask.ID); ok {
+			subtaskdetail.MaxScore = msc.(int)
+		} else {
+			if err := dbConn.GetContext(c.Request().Context(), &subtaskdetail.MaxScore, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtask score: "+err.Error())
+			}
+			subtaskmaxscorecache.Store(subtask.ID, subtaskdetail.MaxScore)
 		}
 		res.Subtasks = append(res.Subtasks, subtaskdetail)
 		res.MaxScore += subtaskdetail.MaxScore
@@ -697,8 +708,13 @@ func getSubmissionsHandler(c echo.Context) error {
 			submissiondetail.SubTaskDisplayName = subtask.DisplayName
 			submissiondetail.Score = answer.Score
 
-			if err := dbConn.GetContext(c.Request().Context(), &submissiondetail.SubTaskMaxScore, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtask score: "+err.Error())
+			if msc, ok := subtaskmaxscorecache.Load(subtask.ID); ok {
+				submissiondetail.SubTaskMaxScore = msc.(int)
+			} else {
+				if err := dbConn.GetContext(c.Request().Context(), &submissiondetail.SubTaskMaxScore, "SELECT MAX(score) FROM answers WHERE subtask_id = ?", subtask.ID); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtask score: "+err.Error())
+				}
+				subtaskmaxscorecache.Store(subtask.ID, submissiondetail.SubTaskMaxScore)
 			}
 		}
 
