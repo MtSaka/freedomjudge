@@ -95,6 +95,7 @@ func initializeHandler(c echo.Context) error {
 	subtaskcache = sync.Map{}
 	standingssubcache = sync.Map{}
 	standingssubexistscache = sync.Map{}
+	usercache = sync.Map{}
 
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{

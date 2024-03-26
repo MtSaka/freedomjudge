@@ -21,6 +21,7 @@ var (
 
 	standingssubcache       = sync.Map{}
 	standingssubexistscache = sync.Map{}
+	usercache               = sync.Map{}
 )
 
 type Task struct {
@@ -215,23 +216,39 @@ func getstandings(ctx context.Context) (Standings, error) {
 		teamstandings.TotalScore = 0
 
 		leader := User{}
-		if err := dbConn.GetContext(ctx, &leader, "SELECT * FROM users WHERE id = ?", team.LeaderID); err != nil {
-			return Standings{}, err
+		if u, ok := usercache.Load(team.LeaderID); ok {
+			leader = u.(User)
+		} else {
+			if err := dbConn.GetContext(ctx, &leader, "SELECT * FROM users WHERE id = ?", team.LeaderID); err != nil {
+				return Standings{}, err
+			}
+			usercache.Store(team.LeaderID, leader)
 		}
+
 		teamstandings.LeaderName = leader.Name
 		teamstandings.LeaderDisplayName = leader.DisplayName
 		if team.Member1ID != nulluserid {
 			member1 := User{}
-			if err := dbConn.GetContext(ctx, &member1, "SELECT * FROM users WHERE id = ?", team.Member1ID); err != nil {
-				return Standings{}, err
+			if u, ok := usercache.Load(team.Member1ID); ok {
+				member1 = u.(User)
+			} else {
+				if err := dbConn.GetContext(ctx, &member1, "SELECT * FROM users WHERE id = ?", team.Member1ID); err != nil {
+					return Standings{}, err
+				}
+				usercache.Store(team.Member1ID, member1)
 			}
 			teamstandings.Member1Name = member1.Name
 			teamstandings.Member1DisplayName = member1.DisplayName
 		}
 		if team.Member2ID != nulluserid {
 			member2 := User{}
-			if err := dbConn.GetContext(ctx, &member2, "SELECT * FROM users WHERE id = ?", team.Member2ID); err != nil {
-				return Standings{}, err
+			if u, ok := usercache.Load(team.Member2ID); ok {
+				member2 = u.(User)
+			} else {
+				if err := dbConn.GetContext(ctx, &member2, "SELECT * FROM users WHERE id = ?", team.Member2ID); err != nil {
+					return Standings{}, err
+				}
+				usercache.Store(team.Member2ID, member2)
 			}
 			teamstandings.Member2Name = member2.Name
 			teamstandings.Member2DisplayName = member2.DisplayName
@@ -484,7 +501,7 @@ func submitHandler(c echo.Context) error {
 	if err := tx.GetContext(c.Request().Context(), &submissionscount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?)", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get submissions count: "+err.Error())
 	}
-	
+
 	if submissionscount >= task.SubmissionLimit {
 		return echo.NewHTTPError(http.StatusBadRequest, "submission limit exceeded")
 	}
@@ -686,8 +703,13 @@ func getSubmissionsHandler(c echo.Context) error {
 		}
 
 		user := User{}
-		if err := dbConn.GetContext(c.Request().Context(), &user, "SELECT * FROM users WHERE id = ?", submission.UserID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user: "+err.Error())
+		if u, ok := usercache.Load(submission.UserID); ok {
+			user = u.(User)
+		} else {
+			if err := dbConn.GetContext(c.Request().Context(), &user, "SELECT * FROM users WHERE id = ?", submission.UserID); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user: "+err.Error())
+			}
+			usercache.Store(submission.UserID, user)
 		}
 		submissiondetail.UserName = user.Name
 		submissiondetail.UserDisplayName = user.DisplayName
