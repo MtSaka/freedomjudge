@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"sort"
 
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -288,9 +287,15 @@ func getstandings(ctx context.Context) (Standings, error) {
 	}
 
 	// sort
-	sort.Slice(standings,func(i, j int) bool {
-		return (standings.StandingsData[i].TotalScore < standings.StandingsData[j].TotalScore) || (standings.StandingsData[i].TotalScore == standings.StandingsData[j].TotalScore && standings.StandingsData[i].TeamName > standings.StandingsData[j].TeamName
-	})
+	for i := 0; i < len(standings.StandingsData); i++ {
+		for j := i + 1; j < len(standings.StandingsData); j++ {
+			if (standings.StandingsData[i].TotalScore < standings.StandingsData[j].TotalScore) || (standings.StandingsData[i].TotalScore == standings.StandingsData[j].TotalScore && standings.StandingsData[i].TeamName > standings.StandingsData[j].TeamName) {
+				tmp := standings.StandingsData[i]
+				standings.StandingsData[i] = standings.StandingsData[j]
+				standings.StandingsData[j] = tmp
+			}
+		}
+	}
 	for i := 0; i < len(standings.StandingsData); i++ {
 		standings.StandingsData[i].Rank = 1
 		for j := 0; j < len(standings.StandingsData); j++ {
