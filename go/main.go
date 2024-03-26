@@ -73,7 +73,20 @@ func initializeHandler(c echo.Context) error {
 		c.Logger().Warnf("init.sh failed with err=%s", string(out))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
-
+	// score
+	subs := []Submission{}
+	if err := dbConn.Select(&subs, "SELECT * FROM submissions"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to select submissions: "+err.Error())
+	}
+	for _, sub := range subs {
+		score := 0
+		if err := dbConn.Get(&score, "SELECT COALESCE(score, 0) FROM answers WHERE task_id = ? AND answer = ?", sub.TaskID, sub.Answer); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to select answers: "+err.Error())
+		}
+		if _, err := dbConn.Exec("UPDATE submissions SET score = ? WHERE id = ?", score, sub.ID); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to update submissions: "+err.Error())
+		}
+	}
 	// キャッシュを消す
 	subtaskcache = sync.Map{}
 
