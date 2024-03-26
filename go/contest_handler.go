@@ -450,30 +450,8 @@ func getTaskHandler(c echo.Context) error {
 
 			for i, subtask := range subtasks {
 				subtaskscore := 0
-				leaderscore := 0
-				if err := tx.GetContext(c.Request().Context(), &leaderscore, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.LeaderID); err != nil {
+				if err := tx.GetContext(c.Request().Context(), &subtaskscore, "SELECT COALESCE(MAX(score),0) FROM submissions WHERE subtask_id = ? AND user_id IN (?,?,?)", subtask.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtask score: "+err.Error())
-				}
-				if subtaskscore < leaderscore {
-					subtaskscore = leaderscore
-				}
-				if team.Member1ID != nulluserid {
-					member1score := 0
-					if err := tx.GetContext(c.Request().Context(), &member1score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member1ID); err != nil {
-						return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtask score: "+err.Error())
-					}
-					if subtaskscore < member1score {
-						subtaskscore = member1score
-					}
-				}
-				if team.Member2ID != nulluserid {
-					member2score := 0
-					if err := tx.GetContext(c.Request().Context(), &member2score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member2ID); err != nil {
-						return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtask score: "+err.Error())
-					}
-					if subtaskscore < member2score {
-						subtaskscore = member2score
-					}
 				}
 				res.Subtasks[i].Score = subtaskscore
 				res.Score += subtaskscore
