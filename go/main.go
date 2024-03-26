@@ -149,7 +149,7 @@ func main() {
 		e.Logger.Errorf("failed to connect db: %v", err)
 		os.Exit(1)
 	}
-	db.SetMaxOpenConns(10)
+	db.SetMaxOpenConns(1000)
 	defer db.Close()
 	if err := db.Ping(); err != nil {
 		e.Logger.Errorf("failed to ping db: %v", err)
