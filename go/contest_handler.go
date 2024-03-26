@@ -72,8 +72,13 @@ func gettaskabstarcts(ctx context.Context, c echo.Context) ([]TaskAbstract, erro
 	for _, task := range tasks {
 		maxscore := 0
 		subtasks := []Subtask{}
-		if err := dbConn.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
-			return []TaskAbstract{}, err
+		if s, ok := subtaskcache.Load(task.ID); ok {
+			subtasks = s.([]Subtask)
+		} else {
+			if err := dbConn.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
+				return []TaskAbstract{}, err
+			}
+			subtaskcache.Store(task.ID, subtasks)
 		}
 		for _, subtask := range subtasks {
 			maxscore_for_subtask := 0
@@ -240,8 +245,13 @@ func getstandings(ctx context.Context) (Standings, error) {
 			taskscoringdata.Score = 0
 
 			subtasks := []Subtask{}
-			if err := dbConn.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
-				return Standings{}, err
+			if s, ok := subtaskcache.Load(task.ID); ok {
+				subtasks = s.([]Subtask)
+			} else {
+				if err := dbConn.SelectContext(ctx, &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
+					return Standings{}, err
+				}
+				subtaskcache.Store(task.ID, subtasks)
 			}
 			if b, ok := standingssubexistscache.Load(team.ID*10000 + task.ID); ok {
 				taskscoringdata.HasSubmitted = b.(bool)
@@ -347,14 +357,14 @@ func getTaskHandler(c echo.Context) error {
 	if cache_data, ok := subtaskcache.Load(task.ID); ok {
 		// データがキャッシュされているので、それを読み込む
 		subtasks = cache_data.([]Subtask)
-	}
+	} else {
+		if err := dbConn.SelectContext(c.Request().Context(), &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtasks: "+err.Error())
+		}
 
-	if err := dbConn.SelectContext(c.Request().Context(), &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtasks: "+err.Error())
+		// キャッシュにデータを保存
+		subtaskcache.Store(task.ID, subtasks)
 	}
-
-	// キャッシュにデータを保存
-	subtaskcache.Store(task.ID, subtasks)
 
 	res := TaskDetail{
 		Name:            task.Name,
@@ -503,8 +513,13 @@ func submitHandler(c echo.Context) error {
 	res.RemainingSubmissions = task.SubmissionLimit - submissionscount - 1
 
 	subtasks := []Subtask{}
-	if err := tx.SelectContext(c.Request().Context(), &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtasks: "+err.Error())
+	if s, ok := subtaskcache.Load(task.ID); ok {
+		subtasks = s.([]Subtask)
+	} else {
+		if err := tx.SelectContext(c.Request().Context(), &subtasks, "SELECT * FROM subtasks WHERE task_id = ?", task.ID); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get subtasks: "+err.Error())
+		}
+		subtaskcache.Store(task.ID, subtasks)
 	}
 	subtaskid := -1
 	for _, subtask := range subtasks {
