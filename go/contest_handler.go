@@ -48,6 +48,7 @@ type Submission struct {
 	UserID      int       `db:"user_id"`
 	SubmittedAt time.Time `db:"submitted_at"`
 	Answer      string    `db:"answer"`
+	Score       int       `db:"score"`
 }
 
 type TaskAbstract struct {
