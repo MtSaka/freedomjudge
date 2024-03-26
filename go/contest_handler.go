@@ -664,7 +664,7 @@ func submitHandler(c echo.Context) error {
 
 	timestamp := time.Unix(req.Timestamp, 0)
 
-	if _, err = tx.ExecContext(ctx, "INSERT INTO submissions (task_id, user_id, submitted_at, answer, task_id, score) VALUES (?, ?, ?, ?, ?, ?)", task.ID, user.ID, timestamp, req.Answer, subtaskid, res.Score); err != nil {
+	if _, err = tx.ExecContext(ctx, "INSERT INTO submissions (task_id, user_id, submitted_at, answer, subtask_id, score) VALUES (?, ?, ?, ?, ?, ?)", task.ID, user.ID, timestamp, req.Answer, subtaskid, res.Score); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert submission: "+err.Error())
 	}
 
