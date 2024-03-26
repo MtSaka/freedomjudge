@@ -275,27 +275,11 @@ func getstandings(ctx context.Context, tx *sqlx.Tx) (Standings, error) {
 				return Standings{}, err
 			}
 			submissioncount := 0
-			if err := tx.GetContext(ctx, &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.LeaderID); err != nil {
+			if err := tx.GetContext(ctx, &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) LIMIT 1", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
 				return Standings{}, err
 			}
 			if submissioncount > 0 {
 				taskscoringdata.HasSubmitted = true
-			}
-			if team.Member1ID != nulluserid {
-				if err := tx.GetContext(ctx, &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member1ID); err != nil {
-					return Standings{}, err
-				}
-				if submissioncount > 0 {
-					taskscoringdata.HasSubmitted = true
-				}
-			}
-			if team.Member2ID != nulluserid {
-				if err := tx.GetContext(ctx, &submissioncount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member2ID); err != nil {
-					return Standings{}, err
-				}
-				if submissioncount > 0 {
-					taskscoringdata.HasSubmitted = true
-				}
 			}
 
 			sc := []int{}
@@ -305,7 +289,7 @@ func getstandings(ctx context.Context, tx *sqlx.Tx) (Standings, error) {
 			for _, s := range sc {
 				taskscoringdata.Score += s
 			}
-				
+
 			scoringdata = append(scoringdata, taskscoringdata)
 			teamstandings.TotalScore += taskscoringdata.Score
 		}
@@ -397,7 +381,7 @@ func getTaskHandler(c echo.Context) error {
 
 	subtasks := []Subtask{}
 
-	if cache_data, ok := subtaskcache.Load(task.ID) ; ok {
+	if cache_data, ok := subtaskcache.Load(task.ID); ok {
 		// データがキャッシュされているので、それを読み込む
 		subtasks = cache_data.([]Subtask)
 	}
@@ -589,8 +573,6 @@ func submitHandler(c echo.Context) error {
 	if submissionscount >= task.SubmissionLimit {
 		return echo.NewHTTPError(http.StatusBadRequest, "submission limit exceeded")
 	}
-
-	
 
 	res := SubmitResponse{}
 
