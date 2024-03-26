@@ -81,7 +81,7 @@ func initializeHandler(c echo.Context) error {
 	}
 	for _, sub := range subs {
 		ans := Answer{}
-		if err := dbConn.Get(&ans, "SELECT * FROM answers WHERE task_id = ? AND answer = ?", sub.TaskID, sub.Answer); err == sql.ErrNoRows{
+		if err := dbConn.Get(&ans, "SELECT * FROM answers WHERE task_id = ? AND answer = ?", sub.TaskID, sub.Answer); err == sql.ErrNoRows {
 			ans.Score = 0
 			ans.SubtaskID = -1
 		} else if err != nil {
@@ -107,8 +107,8 @@ func main() {
 	}()
 
 	e := echo.New()
-	e.Debug = true
-	e.Logger.SetLevel(echolog.DEBUG)
+	e.Debug = false
+	e.Logger.SetLevel(echolog.ERROR)
 	e.Use(middleware.Logger())
 	cookiestore := sessions.NewCookieStore(secret)
 	e.Use(session.Middleware(cookiestore))
@@ -142,7 +142,6 @@ func main() {
 
 	// 以上に当てはまらなければ index.html を返す
 	e.GET("/*", getIndexHandler)
-
 
 	// DB接続
 	db, err := connectDB()
