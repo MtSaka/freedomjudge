@@ -19,6 +19,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echolog "github.com/labstack/gommon/log"
+
+	_ "net/http/pprof"
+
+	"github.com/felixge/fgprof"
 )
 
 const (
@@ -79,6 +83,11 @@ func initializeHandler(c echo.Context) error {
 }
 
 func main() {
+	http.DefaultServeMux.Handle("/debug/fgprof/profile", fgprof.Handler())
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
+
 	e := echo.New()
 	e.Debug = true
 	e.Logger.SetLevel(echolog.DEBUG)
@@ -115,7 +124,7 @@ func main() {
 
 	// 以上に当てはまらなければ index.html を返す
 	e.GET("/*", getIndexHandler)
-	
+
 
 	// DB接続
 	db, err := connectDB()
