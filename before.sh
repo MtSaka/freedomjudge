@@ -13,7 +13,7 @@ git pull
 # 設定ファイルのコピー
 sudo cp ~/webapp/conf/nginx.conf /etc/nginx/nginx.conf
 sudo cp ~/webapp/conf/risucontest.conf /etc/nginx/sites-enabled/risucontest.conf
-sudo cp ~/webapp/conf/mysql.cnf /etc/mysql/mysql.conf.d/mysqld.cnf
+sudo cp ~/webapp/conf/mysqld.cnf /etc/mysql/mysql.conf.d/mysqld.cnf
 # コンパイル
 cd ~/webapp/go
 go build -o risucontest
