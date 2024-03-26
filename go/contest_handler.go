@@ -481,26 +481,10 @@ func submitHandler(c echo.Context) error {
 	}
 
 	submissionscount := 0
-	if err := tx.GetContext(c.Request().Context(), &submissionscount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.LeaderID); err != nil {
+	if err := tx.GetContext(c.Request().Context(), &submissionscount, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?)", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get submissions count: "+err.Error())
 	}
-
-	if team.Member1ID != nulluserid {
-		cnt := 0
-		if err := tx.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member1ID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get submissions count: "+err.Error())
-		}
-		submissionscount += cnt
-	}
-
-	if team.Member2ID != nulluserid {
-		cnt := 0
-		if err := tx.GetContext(c.Request().Context(), &cnt, "SELECT COUNT(*) FROM submissions WHERE task_id = ? AND user_id = ?", task.ID, team.Member2ID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get submissions count: "+err.Error())
-		}
-		submissionscount += cnt
-	}
-
+	
 	if submissionscount >= task.SubmissionLimit {
 		return echo.NewHTTPError(http.StatusBadRequest, "submission limit exceeded")
 	}
