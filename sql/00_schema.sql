@@ -64,3 +64,4 @@ CREATE TABLE `submissions` (
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX `sub_idx` ON `submissions` (`task_id`, `user_id`, `answer`);
+CREATE INDEX `sub_idx2` ON `submissions` (`subtask_id`, `user_id`);
