@@ -298,47 +298,14 @@ func getstandings(ctx context.Context, tx *sqlx.Tx) (Standings, error) {
 				}
 			}
 
-			for _, subtask := range subtasks {
-				subtaskscore := 0
-
-				leaderscore := 0
-				/*if err := tx.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.LeaderID); err != nil {
-					return Standings{}, err
-				}*/
-				if err := tx.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM submissions WHERE subtask_id = ? AND user_id = ?", subtask.ID, team.LeaderID); err != nil {
-					return Standings{}, err
-				}
-
-				if subtaskscore < leaderscore {
-					subtaskscore = leaderscore
-				}
-
-				if team.Member1ID != nulluserid {
-					member1score := 0
-					/*if err := tx.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member1ID); err != nil {
-						return Standings{}, err
-					}*/
-					if err := tx.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM submissions WHERE subtask_id = ? AND user_id = ?", subtask.ID, team.Member1ID); err != nil {
-						return Standings{}, err
-					}
-					if subtaskscore < member1score {
-						subtaskscore = member1score
-					}
-				}
-				if team.Member2ID != nulluserid {
-					member2score := 0
-					/*if err := tx.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member2ID); err != nil {
-						return Standings{}, err
-					}*/
-					if err := tx.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM submissions WHERE subtask_id = ? AND user_id = ?", subtask.ID, team.Member2ID); err != nil {
-						return Standings{}, err
-					}
-					if subtaskscore < member2score {
-						subtaskscore = member2score
-					}
-				}
-				taskscoringdata.Score += subtaskscore
+			sc := []int{}
+			if err := tx.SelectContext(ctx, &sc, "SELECT MAX(score) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) GROUP BY subtask_id;", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
+				return Standings{}, err
 			}
+			for _, s := range sc {
+				taskscoringdata.Score += s
+			}
+				
 			scoringdata = append(scoringdata, taskscoringdata)
 			teamstandings.TotalScore += taskscoringdata.Score
 		}
