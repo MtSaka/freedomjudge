@@ -80,13 +80,14 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to select submissions: "+err.Error())
 	}
 	for _, sub := range subs {
-		score := 0
-		if err := dbConn.Get(&score, "SELECT score FROM answers WHERE task_id = ? AND answer = ?", sub.TaskID, sub.Answer); err == sql.ErrNoRows{
-			score = 0
+		ans := Answer{}
+		if err := dbConn.Get(&ans, "SELECT * FROM answers WHERE task_id = ? AND answer = ?", sub.TaskID, sub.Answer); err == sql.ErrNoRows{
+			ans.Score = 0
+			ans.SubtaskID = -1
 		} else if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to select answers: "+err.Error())
 		}
-		if _, err := dbConn.Exec("UPDATE submissions SET score = ? WHERE id = ?", score, sub.ID); err != nil {
+		if _, err := dbConn.Exec("UPDATE submissions SET score = ? , subtask_id = ? WHERE id = ?", ans.Score, ans.SubtaskID, sub.ID); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to update submissions: "+err.Error())
 		}
 	}
