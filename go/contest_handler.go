@@ -18,6 +18,8 @@ var (
 	// Subtask は update がないのでキャッシュしておく
 	// メモ: initializeHandler でキャッシュを消すのを忘れずに
 	subtaskcache = sync.Map{}
+
+	standingssubcache = sync.Map{}
 )
 
 type Task struct {
@@ -111,43 +113,19 @@ func gettaskabstarcts(ctx context.Context, c echo.Context) ([]TaskAbstract, erro
 					}
 					submissioncount += cnt
 				}
-				sc := []int{}
-				if err := dbConn.SelectContext(ctx, &sc, "SELECT MAX(score) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) GROUP BY subtask_id;", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
-					return []TaskAbstract{}, err
-				}
-				for _, s := range sc {
-					score += s
-				}
 
-				/*for _, subtask := range subtasks {
-					score_for_subtask := 0
-					leaderscore := 0
-					if err := dbConn.GetContext(ctx, &leaderscore, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.LeaderID); err != nil {
+				if sc, ok := standingssubcache.Load(team.ID*10000 + task.ID); ok {
+					score = sc.(int)
+				} else {
+					sc := []int{}
+					if err := dbConn.SelectContext(ctx, &sc, "SELECT MAX(score) FROM submissions WHERE task_id = ? AND user_id IN (?,?,?) GROUP BY subtask_id;", task.ID, team.LeaderID, team.Member1ID, team.Member2ID); err != nil {
 						return []TaskAbstract{}, err
 					}
-					if score_for_subtask < leaderscore {
-						score_for_subtask = leaderscore
+					for _, s := range sc {
+						score += s
 					}
-					if team.Member1ID != nulluserid {
-						member1score := 0
-						if err := dbConn.GetContext(ctx, &member1score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member1ID); err != nil {
-							return []TaskAbstract{}, err
-						}
-						if score_for_subtask < member1score {
-							score_for_subtask = member1score
-						}
-					}
-					if team.Member2ID != nulluserid {
-						member2score := 0
-						if err := dbConn.GetContext(ctx, &member2score, "SELECT COALESCE(MAX(score),0) FROM answers WHERE subtask_id = ? AND EXISTS (SELECT * FROM submissions WHERE task_id = ? AND user_id = ? AND submissions.answer = answers.answer)", subtask.ID, task.ID, team.Member2ID); err != nil {
-							return []TaskAbstract{}, err
-						}
-						if score_for_subtask < member2score {
-							score_for_subtask = member2score
-						}
-					}
-					score += score_for_subtask
-				}*/
+					standingssubcache.Store(team.ID*10000+task.ID, score)
+				}
 			} else if err != sql.ErrNoRows {
 				return []TaskAbstract{}, err
 			}
@@ -228,7 +206,7 @@ func getstandings(ctx context.Context) (Standings, error) {
 		for _, s := range sc {
 			maxscore += s
 		}
-		
+
 		standings.TasksData = append(standings.TasksData, TaskAbstract{
 			Name:        task.Name,
 			DisplayName: task.DisplayName,
@@ -579,6 +557,10 @@ func submitHandler(c echo.Context) error {
 
 	if _, err = tx.ExecContext(ctx, "INSERT INTO submissions (task_id, user_id, submitted_at, answer, subtask_id, score) VALUES (?, ?, ?, ?, ?, ?)", task.ID, user.ID, timestamp, req.Answer, subtaskid, res.Score); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert submission: "+err.Error())
+	}
+
+	if res.IsScored {
+		standingssubcache.Delete(team.ID*10000 + task.ID)
 	}
 
 	if err := tx.Commit(); err != nil {
